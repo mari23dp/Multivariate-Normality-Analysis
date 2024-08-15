@@ -1,6 +1,4 @@
-Here's the README in English:
 
----
 
 # Multivariate Normality Analysis
 
