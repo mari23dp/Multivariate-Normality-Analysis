@@ -1,0 +1,664 @@
+---
+title: '**Taller 1 Multivariado**'
+author: "**Juan Jose Rodriguez Cubillos** | **Paula Sofia Torres Rodriguez** \n\n
+  **Mauricio Rodriguez Cordoba** \n\n **Mariana Díaz Puentes**"
+date: "**2024-08-10**"
+output:
+  pdf_document:
+   latex_engine: lualatex
+header-includes:
+ - \usepackage{fontspec}
+ - \usepackage{unicode-math}
+geometry: left=2cm, right=2cm, top=2cm, bottom=2cm
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#install.packages("tidyverse")
+#install.packages("dplyr")
+#install.packages("MASS")
+#install.packages("knitr")
+#install.packages("kableExtra")
+#install.packages("car")
+require(kableExtra)
+require(tidyverse)
+require(MASS)
+require(MVN)
+require(mvShapiroTest)
+require(dplyr)
+require(knitr)
+require(ggplot2)
+require(corrplot)
+require(psych)
+require(car)
+require(tinytex)
+require(readr)
+require(MVA)
+```
+
+
+## Introducción
+
+<div style="text-align: justify;">
+
+El objetivo del informe es realizar un análisis detallado para explorar la normalidad multivariada en un conjunto de datos. A lo largo del informe, se abordarán diferentes etapas del análisis, la obtención de estadísticas descriptivas, la visualización de correlaciones, y la aplicación de pruebas informales de normalidad multivariada. Este análisis permitirá determinar si los datos cumplen con las suposiciones de normalidad multivariada.
+
+<div style="text-align: justify;">
+# Punto 1
+
+En el archivo anexo1.csv contiene los datos de una muestra de vectores aleatorios de 3 componentes, X1,X2,...,X40.
+
+```{r Carga del archivo, message=FALSE, warning=FALSE, include=FALSE}
+datos <- read_delim("anexo1.csv", delim = ";", 
+    escape_double = FALSE, trim_ws = TRUE)
+
+datos <- as.data.frame(lapply(datos, function(x) {
+  if(is.character(x)) {
+    as.numeric(gsub(",", ".", x))
+  } else {
+    x
+  }
+}))
+```
+
+
+## a. Evalue la normalidad multivariada de la muestra dada.
+
+### Analisis exploratorio de los datos
+
+### Verificacion de datos faltantes
+
+<div style="text-align: justify;">
+Examinar los datos faltantes, con el fin de lograr asegurar que los resultados no estén sesgados ni incorrectos.
+
+```{r Verificacion datos nulos, warning=FALSE}
+
+# Verificamos cuántos valores faltantes hay por columna
+colSums(is.na(datos))
+```
+
+### Estadísticas descriptivas
+
+<div style="text-align: justify;">
+Para determinar si este conjunto de datos se considera normal multivariado, se realizará una investigación inicial de forma descriptiva de cada variable. Se observará si presentan algún comportamiento normal univariado y se analizarán las posibles correlaciones entre ellas.
+
+### Grafico de dispersion de los datos
+
+<div style="text-align: justify;">
+El gráfico de dispersión muestra la relación entre dos variables cuantitativas. Observando la disposición de los puntos, podemos identificar si existe una tendencia lineal o curvilínea entre las variables, o si no hay relación aparente. 
+
+### Scatter Plot
+```{r Dispersion de datos, echo=FALSE, fig.align='center',fig.width=5, fig.height=4}
+
+par(mfrow = c(1, 2))
+# Graficamos la matriz de gráficos de dispersión básica
+pairs(datos)
+par(mfrow = c(1, 1))
+```
+
+<div style="text-align: justify;">
+
+En la matriz de gráficos de dispersión mostrada, se visualizan las relaciones bivariadas entre las tres variables X1, X2 y X3. Cada gráfico individual representa un par de variables, donde los puntos muestran cómo una variable se relaciona con la otra. 
+
+Se observa una tendencia positiva en las relaciones entre las variables, indicando que a medida que una de las variables aumenta, la otra también tiende a aumentar. Esta correlación positiva es evidente en todos los pares de variables: X1 vs X2, X1 vs X3, y X2 vs X3. La alineación de los puntos en una dirección ascendente sugiere una relación lineal fuerte entre las variables. 
+
+
+## Prueba de normalidad multivariada informal
+
+### Gráfico de dispersión con elipses de confianza
+
+
+```{r Prueba de normalidad multivariada informal, echo=FALSE, fig.align='center',fig.height=3}
+
+par(mfrow = c(1,3))
+
+# x1 x2
+x1x2 <- data.frame(datos$X1, datos$X2)
+y1 <- as.matrix.data.frame(x1x2)
+bvbox(y1, method = "robust",
+      xlab = expression(x[1]),
+      ylab = expression(x[2]))
+
+# x1 x3
+x1x3 <- data.frame(datos$X1, datos$X3)
+y2 <- as.matrix.data.frame(x1x3)
+bvbox(y2, method = "robust",
+      xlab = expression(x[1]),
+      ylab = expression(x[3]))
+
+# x2 x3
+x2x3 <- data.frame(datos$X2, datos$X3)
+y3 <- as.matrix.data.frame(x2x3)
+bvbox(y3, method = "robust",
+      xlab = expression(x[2]),
+      ylab = expression(x[3]))
+
+# Restablecemos la disposición de gráficos a la configuración predeterminada
+par(mfrow = c(1, 1))
+
+```
+<div style="text-align: justify;">
+En los tres gráficos, las elipses de confianza abarcan la mayoría de los puntos, lo que indica que las relaciones bivariadas entre las variables (X1 vs X2, X1 vs X3, y X2 vs X3) son consistentes con la suposición de normalidad multivariada. Las elipses permiten identificar la concentración de los datos y sugiere que no hay desviaciones significativas de la normalidad en los pares de variables analizados. Esto es un indicio que existe una normal multivariada en esta muestra.
+
+### QQplot normal multivariada
+
+<div style="text-align: justify;">
+En el gráfico Q-Q multivariado, comparamos las distancias de Mahalanobis calculadas a partir de los datos observados con los cuantiles teóricos de una distribución chi-cuadrado. Matemáticamente, la distancia de Mahalanobis para las observaciones:
+
+$$
+X: d_i^2 = (\mathbf{X} - \bar{\mathbf{X}})^\top \mathbf{\Sigma}^{-1} (\mathbf{X} - \bar{\mathbf{X}})
+$$
+<div style="text-align: justify;">
+El objetivo es ver si las distancias de Mahalanobis siguen la distribución esperada bajo la normalidad multivariada. Si los datos son multivariadamente normales, las distancias deberían alinearse a lo largo de una línea recta en el gráfico Q-Q.
+```{r Prueba de normalidad multi, message=FALSE, warning=FALSE,fig.align='center',fig.width=5, fig.height=4}
+
+X <- as.matrix(datos)
+Xbarra<-colMeans(X)
+S<-cov(X)
+dm <- mahalanobis(X,Xbarra,S)
+cuantiles <- qchisq(ppoints(length(X)),df=4)
+# Asignamos número de observaciones y dimensión
+n <- length(dm)
+p <- 3
+
+# Calculamos los cuantiles teóricos de la distribución chi-cuadrado con p grados de libertad
+teoricos <- qchisq(ppoints(n), df = p)
+
+# Primero, generamos el gráfico
+qqplot(teoricos, dm, main="QQ Plot de las Distancias de Mahalanobis", 
+       xlab="Cuantiles Teoricos Chi cuadrado", 
+       ylab="Distancias de Mahalanobis Observadas")
+
+# Luego, agregamos la línea diagonal
+abline(0, 1, col="red", lwd=2)
+```
+
+
+<div style="text-align: justify;">
+
+En el gráfico, se observa que los puntos se alinean bastante bien con la línea roja en las partes centrales, lo que sugiere que los datos en ese rango siguen aproximadamente una distribución normal multivariada.
+Sin embargo, en los extremos, algunos puntos comienzan a desviarse de la línea. Estos puntos indican que las distancias de Mahalanobis en los extremos no siguen tan bien la distribución chi-cuadrado esperada. Este comportamiento podría ser una señal de la presencia de valores atípicos o de una distribución diferente a la normal en esos extremos.
+
+## Prueba de normalidad multivariada formal
+
+<div style="text-align: justify;">
+A diferencia de las pruebas informales, como los gráficos Q-Q multivariados, las pruebas formales proporcionan un criterio estadístico objetivo para determinar si se puede aceptar o rechazar la hipótesis de que los datos son multivariadamente normales.
+
+
+Suponga que la muestra fue extraída de una población:
+
+\[
+\text{Pob} \quad X_i = \begin{pmatrix} 
+X_1 \\
+X_2 \\
+X_3 
+\end{pmatrix}
+\]
+
+\text{El interés es probar las hipótesis:}
+
+\[
+\begin{aligned}
+\text{H}_0 &: \mathbf{X} \sim N_3 \left( 
+\begin{pmatrix} 
+\mu_1 \\
+\mu_2 \\
+\mu_3 
+\end{pmatrix}, 
+\begin{pmatrix} 
+\sigma_1^2 & \sigma_{12} & \sigma_{13} \\
+\sigma_{21} & \sigma_2^2 & \sigma_{23} \\
+\sigma_{31} & \sigma_{32} & \sigma_3^2 
+\end{pmatrix} 
+\right) \\[1em]  % Espacio entre hipótesis
+\text{H}_1 &: \mathbf{X}_{3 \times 1} \not\sim N_3 \left( 
+\begin{pmatrix} 
+\mu_1 \\
+\mu_2 \\
+\mu_3 
+\end{pmatrix}, 
+\begin{pmatrix} 
+\sigma_1^2 & \sigma_{12} & \sigma_{13} \\
+\sigma_{21} & \sigma_2^2 & \sigma_{23} \\
+\sigma_{31} & \sigma_{32} & \sigma_3^2 
+\end{pmatrix} 
+\right)
+\end{aligned}
+\]
+
+Para resolver esta prueba de hipótesis, se usarán distintos métodos con el fin de comprobar el supuesto de normalidad multivariada, además de compararlos y observar si existe una diferencia entre ellos.
+
+### Prueba De Shapiro 
+```{r Prueba formal, message=FALSE, warning=FALSE}
+
+# ----- Prueba de Shapiro ----- #
+require(mvShapiroTest)
+mvShapiro.Test(X)
+# ----- Otras Pruebas ----- #
+mvn(X, mvnTest="mardia") # test de Mardia
+mvn(X, mvnTest="hz") # test de Henze-Zirkler
+mvn(X, mvnTest="royston") # test de Royston
+mvn(X, mvnTest="dh") # test de Doornik-Hansen
+```
+Al observar los test, se logra identificar que no se obtuvo suficiente evidencia para rechazar H0, por ende es una muestra con comportamiento normal multivariado, ensta muestra de 3 variables y 40 unidades de investigacion, las pruebas demuestran suficiente potencia para ello.
+
+Sin embargo, según Porras Cerron (2016), cuando se evalúa la potencia de las pruebas de normalidad multivariada, los resultados indican que no hay diferencias significativas entre las pruebas analizadas. Sin embargo, se observa que al aumentar el número de investigaciones o variables en el estudio, la potencia de algunas pruebas, como la de Mardia, tiende a disminuir ligeramente. Por otro lado, en pruebas como la de Royston, la potencia puede aumentar a medida que se incrementa el tamaño de la muestra o el número de variables. Esto sugiere que la elección de la prueba más adecuada puede depender de la estructura y tamaño de los datos utilizados en la investigación.
+
+
+
+## b. Si el vector de medias poblacionales es $\mu = [0.1, -0.2, 0.05]^t$ y $S$ es la matriz de varianzas-covarianzas muestrales. ¿Cuál es la distribución aproximada de $40 \left(\overline{X} - [0.1, -0.2, 0.05]^t\right)^t S^{-1} \left(\overline{X} - [0.1, -0.2, 0.05]^t\right)$?
+
+Para resolver este problema, primero se debe partir de la formula general de las distancias  de Mahalanobis muestrales para cualquier vector p variado $X$: $d_i^2 = (\mathbf{X} - \bar{\mathbf{X}})^\top \mathbf{\Sigma}^{-1} (\mathbf{X} - \bar{\mathbf{X}})$, donde $\mathbf{X}$ es el vector de datos, $\bar{\mathbf{X}}$ es el vector de medias muestrales y $\mathbf{\Sigma}$ es la matriz de varianzas-covarianzas poblacionales. 
+
+Si consideramos la distribución del vector de medias muestrales $\overline{X}$, se tiene que $\overline{X} \sim N_p(\mu, \frac{\Sigma}{n})$. Por lo tanto, la distribución de la distancia de Mahalanobis muestral es $d_i^2 = (\overline{X} - \mu)^\top \left(\frac{\Sigma}{n}\right)^{-1} (\overline{X} - \mu) \sim \chi^2_p$, y considerando el teorema de limite central y que el vector de medias muestrales es un estimador insesgado de $\mu$, se tiene que la varianza muestral es $S$ tiende a la poblacional $\Sigma$. Teniendo en cuenta esto, el vector de distancias de Mahalanobis muestrales para la media se podria escribir como $d_i^2 = (\overline{X} - \mu)^\top (\frac{S}{n})^{-1} (\overline{X} - \mu)$. Si se reescribe esta formula modificando el exponente de n la formula queda de la siguiente manera: $d_i^2 = n(\overline{X} - \mu)^\top S^{-1} (\overline{X} - \mu)$, la cual corresponde a la formula que buscamos estudiar y uqe podemos concluir que corresponde a la distancia de Mahalanobis muestral para el vector de medias poblacionales. Por lo tanto, la distribución aproximada de $40 \left(\overline{X} - [0.1, -0.2, 0.05]^t\right)^t S^{-1} \left(\overline{X} - [0.1, -0.2, 0.05]^t\right)$ es $\chi^2_3$.
+
+
+## c. Usando la distancia cuadrada generalizada establezca si existen valores atípicos.
+
+
+```{r Valores Atipicos, echo=TRUE, fig.align='center'}
+par(mfrow = c(1,1.5))
+
+X<-as.matrix(datos)
+Xbarra<-colMeans(X)
+S<-cov(X)
+dm<-mahalanobis(X,Xbarra,S)
+cuantiles<-qchisq(ppoints(length(X)),df=4)
+Out<-mvn(datos, mvnTest = "mardia",
+         multivariateOutlierMethod ="adj") 
+
+
+
+
+```
+
+<div style="text-align: justify;">
+Se logra identificar 3 datos atípicos (21,29 y 35), de los cuales se encuentran a la derecha del cuartil de la chi cuadrado ajustada (9.348), indicada por la línea azul. Esto significa que la distancia de Mahalanobis de estas unidades de investigación son inusualmente altas.  
+Al observar estos resultados, se puede deducir que la cantidad de valores atípicos en datos multivariados aumenta con el número de variables, ya que la probabilidad de que una observación se aleje significativamente de la media en alguna dimensión aumenta. Sin embargo, esta relación no es estrictamente proporcional dependerá de factores como la correlación y estructura de los datos. 
+
+
+
+### Referencia
+Porras Cerron, J. C. (2016). Comparación de pruebas de normalidad multivariada. Anales Científicos, 77(2), 141-146. https://doi.org/10.21704/ac.v77i2.483
+
+# Punto 2
+## Realizamos la carga de datos
+
+**MultBiplotR** provee a traves de los datos *Protein* la información de datos nutricionales para habitantes de 25 paises de europa en la decadada de los 70s. Las variables presentes son: 
+
+• **Comunist:** Presencia del comunismo en el país 
+
+• **Region:** Nombre de la región que se encuentra el país
+
+• **RedMeat:** Consumo de proteínas provenientes de carnes rojas.
+
+• **WhiteMeat:** Consumo de proteínas provenientes de carnes blancas.
+
+• **Eggs:** Consumo de proteínas del huevo.
+
+• **Milk:**Consumo de proteínas de la leche.
+
+• **Fish:** Consumo de proteínas provenientes del pescado.
+
+• **Cereals:** Consumo de proteínas procedentes de cereales.
+
+• **Starch:** Consumo de proteínas provenientes de carbohidratos.
+
+• **Nuts:** Consumo de proteínas procedentes de cereales, frutos secos y semillas oleaginosas.
+
+• **FruitVeg:** Consumo de proteínas procedentes de frutas y verduras.
+
+Como se puede observar, nueve de las variables representan diferentes fuentes de proteína. Asumimos que todas están expresadas en **gramos por persona por día**. Aunque esto no es explícito en la documentación, se consultaron trabajos como los del programa de inteligencia de negocios la [Universidad de Texas](https://github.com/jgscott/STA380/tree/master), donde se adoptó la misma suposición.
+
+Dado lo anterior, procedemos a instalar el paquete **MultBiplotR**, renombrando y convirtiendo a DataFrame el dataset *Protein*.
+```{r , message = FALSE}
+#install.packages("MultBiplotR")
+require(MultBiplotR)
+
+# Renombramos y convertimos a Data Frame
+Data <- Protein  %>% as.data.frame()
+
+# Hacemos unas modificaciones para mostrar el nombre del país
+Data$Country <- rownames(Data)
+rownames(Data) <- NULL  
+Data <- Data[, c("Country", colnames(Data)[-ncol(Data)])]
+
+# Mostramos los datos
+kable(Data) %>% kable_styling(font_size = 6, full_width = FALSE)
+```
+
+
+## a. Determine y analice el vector de medias y la matriz de covarianzas muestrales para las **diferentes regiones.**
+
+
+### Vector De Medias
+
+Dado que tenemos la muestra, \(\mathbf{X}_1, \mathbf{X}_2, \dots, \mathbf{X}_{25}\), nuestro objetivo es calcular y analizar el vector de medias \(\boldsymbol{\overline{\symbf{x}}} = \begin{pmatrix}\overline{x}_1 \\\overline{x}_2 \\\vdots \\\overline{x}_{9}\end{pmatrix}\), para ello calculamos las medias de cada una de las 9 variables númericas, exceptuando *Comunist* y *Region*.
+
+```{r}
+#Filtramos para quitar Region y Comunist
+F_Data <-  Data[, !(colnames(Data) %in% c("Country", "Comunist", "Region"))]
+
+# Calculamos y mostramos el vector de medias
+kable(colMeans(F_Data), col.names = "$\\overline{X}$")
+```
+
+De acuerdo con los resultados, los cereales son, en promedio, la principal fuente de proteína diaria por persona, seguidos por la leche. En contraste, los huevos y las nueces proporcionan la menor cantidad de proteína. Las demás fuentes contribuyen con entre 4 y 9 gramos de proteína al día por persona.
+
+
+### Matriz Covarianzas
+
+Para nuestro otro objetivo que es la matriz de covarianzas $\symbf{\Sigma} = \begin{pmatrix}\sigma_{11} &\sigma_{12} & \sigma_{13} & \cdots & \sigma_{1,9} \\\sigma_{21} & \sigma_{22} & \sigma_{23} & \cdots & \sigma_{2,9} \\\sigma_{31} & \sigma_{32} & \sigma_{33} & \cdots & \sigma_{3,9} \\\vdots     & \vdots     & \vdots     & \ddots & \vdots \\\sigma_{9,1} & \sigma_{9,2} & \sigma_{9,3} & \cdots & \sigma_{9,9} \\\end{pmatrix}$ necesitamos excluir de nuevo a las variables *Comunist* y *Region*, y calcular la información que proporciona la matriz para las 9 variables.
+
+```{r}
+# Calculamos y mostramos el vector de medias
+kable(cov(F_Data), digits = 3) %>%  kable_styling(font_size = 8, full_width = FALSE)
+```
+En la figura anterior se presenta la matriz de varianzas y covarianzas, donde en la diagonal se pueden identificar las varianzas de las variables correspondientes. Se observa que la variable 'Cereal' tiene una varianza aproximadamente de 120, lo que, en comparación con otras variables, resulta considerablemente alta. De manera similar, la columna 'Milk', aunque no tan extrema con un valor de 50, también muestra una varianza relativamente grande, seguida de 'Fish', 'Red Meat' y 'White Meat', con un valor al entre 11 y 12. Las demás variables mantienen varianzas en un rango de 1 a 3.5.
+
+En cuanto a las covarianzas, es importante recordar que esta matriz revela la dirección de la relación entre las variables (positiva o negativa) sin indicar su magnitud absoluta. Se destacan relaciones negativas significativas entre 'Cereal' y 'Milk', así como entre 'Cereal' con 'Red Meat' y 'White Meat'. Por otro lado, las relaciones positivas más notables se observan entre 'Milk' y 'Red Meat'.
+
+
+## b. Calcule la media de las variables por regiones ¿que puede decir al respecto?
+
+Con el fin de calcular las medias por región realizamos un filtro que permita agrupar los países por regiones, y luego procedemos a realizar el cálculo de la media de todas las variables, lo que resulta en la siguiente matriz:
+
+```{r, warning=FALSE}
+# Agrupamos los datos por región
+G_Data <- Data %>% group_by(Region)
+
+# Realizamos el calculo de las medias a lo largo de las variables númericas
+MediaxRegion <- G_Data %>% summarize(
+    across(Red_Meat:Fruits_Vegetables, mean, na.rm = TRUE)
+  )
+
+#Mostramos las medias por region
+kable(MediaxRegion, digits = 3, caption = "Vectores De Medias Por Región") %>%
+  kable_styling(font_size = 10, full_width = FALSE)
+```
+En la tabla se observa que, en la región del norte, la proteína más consumida es la leche, mientras que en el centro y el sur predomina el cereal. Las nueces son en promedio las menos consumidas en el norte y el centro, mientras que, en el sur, los huevos registran el menor consumo. 
+
+Poe otro lado, no se identifica un patrón de consumo promedio similar para ninguna proteína específica entre las distintas regiones. Sin embargo, en la zona sur, el consumo promedio de carnes blancas y pescados es similar, al igual que el de nueces y frutas y vegetales. De manera similar ocurre en la región central respecto a el consumo promedio de huevos y pescado.
+
+## c. Intente construir grupos de paises usando representaciones pictóricas (gráficos de estrellas o caras de Chernoff).
+
+Con el fin realizar los posibles grupos de países vamos a observar cómo sale nuestro gráfico de estrellas ya que es un gráfico más reconocible para mirar que países pueden ser agrupados mediante una puntuación alta de las variables compartidas: 
+
+```{r, fig.align='center', fig.height= 5, fig.width= 6}
+# Hacemos la función de escalado de Min-Max
+min_max_norm <- function(x) {
+  (x - min(x)) / (max(x) - min(x))}
+
+# Escalamos las variables usando Min-Max 
+F_Data_std <- F_Data %>% mutate(across(everything(), min_max_norm)) %>% as.data.frame()    
+
+# Añadimos la columna para indentificar los países
+F_Data_std$Country <- Data$Country
+
+# Creamos y mostramos el gráfico de estrellas con ajustes
+stars(F_Data_std[, -10], labels = F_Data_std$Country,key.loc = c(15, 1.25), 
+main = "Gráficos de Estrellas para Países", draw.segments = TRUE,
+col.segments = rainbow(ncol(F_Data_std) - 1), cex.main = 1.5, 
+cex.lab = 2, lty = 1.5, ncol = 8)                   
+```
+
+### Analisis Grupos
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.6\textwidth, height=0.45\textheight]{SDN.png}
+\caption{Grupo Con Alto Consumo de Huevos, Leche y Carnohidratos}
+\end{figure}
+
+En el primer grupo encontramos 3 países pertenecientes al norte de Europa, donde debido a las bajas temperaturas la siembra de varios cultivos es muy complicada así que su consumo de proteína se evidencia en otros productos, relacionados al mundo de la ganadería y proteínas de origen animal, siendo la leche, los huevos y otros carbohidratos los principales, aunque también destacan las carnes rojas, blancas y el pescado. 
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.6\textwidth, height=0.45\textheight]{GBU.png}
+\caption{Grupo Con Alto Consumo de Huevos, Carne Blanca y Carnohidratos}
+\end{figure}
+
+El consumo de proteína de este grupo de países del centro de Europa también proviene principalmente de origen animal, sin embargo, a diferencia del primer grupo el consumo de pescado y leche disminuye bastante, pero se ve que hay un mayor consumo de carnes rojas y blancas (principalmente las blancas) aunque si se mantiene el alto consumo de huevos y carbohidratos. 
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.6\textwidth, height=0.45\textheight]{RBY.png}
+\caption{Grupo Con Alto de Cereales y Frutos Secos}
+\end{figure}
+
+Este último grupo situado al este de Europa es el más distinto de los 3 porque, excepto el pescado, el consumo de proteínas animal disminuye mucho (el de carbohidratos también disminuyó) y los frutos secos se alzan como una de las principales fuentes de proteínas, junto con el pescado, para esta región.  
+
+## d. Utilice las herramientas de gráficas más adecuadas para verificar normalidad multivariada.
+
+```{r, echo = FALSE, fig.height= 5,  fig.width=6, fig.align='center'}
+Data_means<-colMeans(F_Data)
+Data_Cov<-cov(F_Data)
+dm<-mahalanobis(F_Data ,Data_means,Data_Cov)
+cuantiles<-qchisq(ppoints(nrow(F_Data)),df=9)
+qqplot(cuantiles,dm)
+abline(0,1)
+```
+
+La gráfica sugiere que los datos transformados están alineados en su mayoría con una distribución chi-cuadrado, lo que sugiere que podrían provenir de una distribución normal multivariada. No obstante, las desviaciones en los extremos podrían indicar la presencia de valores atípicos, lo que justifica una investigación más detallada (como una prueba formal) para confirmar esta hipótesis.
+
+## e. Realice la prueba de Mardia para verificar las hipótesis:
+### H0 : Los datos provienen de una poblacion Normal Multivariada
+### H1 : Los datos NO provienen de una poblacion Normal Multivariada
+
+```{r, echo = FALSE, message = FALSE}
+# Realizamos los test de normalidad multivariada y univariada
+mvn_result <- mvn(F_Data, mvnTest = "mardia", univariateTest = "AD")
+
+# Extraemos los valores que nos interesan para la normalidad multivariada
+test_names_mv <- mvn_result$multivariateNormality$Test
+p_values_mv <- as.numeric(as.character(mvn_result$multivariateNormality$`p value`))
+results_mv <- mvn_result$multivariateNormality$Result
+
+# Extraemos los valores que nos interesan para la normalidad univariada
+test_names_uv <- mvn_result$univariateNormality$Test
+variables_uv <- mvn_result$univariateNormality$Variable
+p_values_uv <- as.numeric(as.character(mvn_result$univariateNormality$`p value`))
+results_uv <- mvn_result$univariateNormality$Normality
+
+# Construimos los data frames
+results_mv_df <- data.frame(
+  Test = test_names_mv,
+  Variable = NA,  # Añadimos la columna 'Variable' con NA para mantener la consistencia
+  `p-value` = ifelse(is.na(p_values_mv), "NA", round(p_values_mv, 3)),
+  Result = results_mv
+)
+
+results_uv_df <- data.frame(
+  Test = test_names_uv,
+  Variable = variables_uv,
+  `p-value` = ifelse(is.na(p_values_uv), "NA", round(p_values_uv, 3)),
+  Result = results_uv
+)
+
+# Renombramos la columna "Result" a "Normality" en ambas tablas para consistencia
+colnames(results_mv_df)[4] <- "Result/Normality"
+colnames(results_uv_df)[4] <- "Result/Normality"
+
+# Combinamos los data frames para mostrarlos juntos
+combined_results_df <- rbind(results_mv_df, results_uv_df)
+
+# Mostramos los resultados en una tabla
+kable(combined_results_df, col.names = c("Test", "Variable", "p-value", "Result/Normality")) %>%
+  kable_styling(font_size = 12, full_width = FALSE)
+```
+
+Podemos observar que la prueba de Mardia no rechaza la hipótesis nula (H0), lo que indica que los datos podrían provenir de una población normal multivariada, con un p-valor aproximado de 0.42 para la asimetría y 0.60 para la curtosis.
+
+En las pruebas de normalidad univariadas, notamos que algunas variables no cumplen con el supuesto de normalidad. Específicamente, las variables Cereal, Nuts, y Fruits_Vegetables presentan p-valores de 0.0101, 0.0155, y 0.0380, respectivamente, lo que sugiere que estas distribuciones se desvían significativamente de la normalidad. No obstante, los p-valores no son extremadamente bajos, lo que podría explicar por qué la normalidad multivariada conjunta no fue rechazada.
+
+
+## f. Verifique si hay outliers (multivariados) e identifíquelos.
+
+```{r, echo = FALSE}
+# Realizamos el análisis
+Out <- mvn(Data[, c(-1,-2,-3)], mvnTest = "mardia",
+           multivariateOutlierMethod = "quan")
+
+# Colocamos los outliers correspondientes con sus países
+outlier_labels <- c("Poland", "Greece", "France", "Albania", "Denmark", "Romania", "Portugal", "Spain")
+outlier_indices <- c(16, 10, 9, 1, 6, 18, 17, 19) 
+
+# Añadimos la leyenda
+legend("bottomright", legend = paste(outlier_indices, outlier_labels, sep = " = "),
+       col = "red", pch = 19, cex = 0.8)
+```
+
+Como podemos observar en el gráfico de distancia de mahalanobis robusta, vemos que son un total de 8 países que cuentan como outliers multivariados, entre ellos vemos un grupo conformado por 7 países que dentro de todo si se alejan en gran medida de la línea trazada de los outliers, entre ellos se encuentran países como **Polonia** que abre el grupo, **Albania** que es la mitad de este conjunto de países y **Portugal** que cierra este colectivo de puntos. 
+
+Por último, no podemos dejar de ver a **España** que es el país más alejado de todos, con una diferencia notable en cuanto a los no outliers, y más aún frente al agrupamiento de los otros 7 outliers, llegando a estar casi 150 puntos más lejos en cuanto a la distancia de mahalanobis robusta. 
+
+## g. Pruebe las hipótesis
+
+Dado el vecto de medias \(\boldsymbol{\mu_0} = \begin{bmatrix} 9, & 7, & 2, & 15, & 5, & 30, & 4, & 3, & 4 \end{bmatrix}^{\top}\), se tiene el interés de comprabar los casos **Univariado** y **Multivariado** para saber si dicho vector es plausible para $\symbf{\mu}$.
+
+### i. De forma **Univariada**
+
+Se tienen las siguientes hipotesis para las 9 variables de los datos: 
+
+*Variables *RedMeat*(${\mu_1}$), *WhiteMeat*(${\mu_2}$), *Eggs*(${\mu_3}$), *Milk*(${\mu_4}$) y *Fish*(${\mu_5}$)*
+
+\[
+\begin{array}{ccccc}
+\begin{aligned}
+\text{H}_0: \mu_1 &= 9 \\
+\text{H}_1: \mu_1 &\neq 9 \\
+\end{aligned}
+&
+\begin{aligned}
+\text{H}_0: \mu_2 &= 7 \\
+\text{H}_1: \mu_2 &\neq 7 \\
+\end{aligned}
+&
+\begin{aligned}
+\text{H}_0: \mu_3 &= 2 \\
+\text{H}_1: \mu_3 &\neq 2 \\
+\end{aligned}
+&
+\begin{aligned}
+\text{H}_0: \mu_4 &= 15 \\
+\text{H}_1: \mu_4 &\neq 15 \\
+\end{aligned}
+&
+\begin{aligned}
+\text{H}_0: \mu_5 &= 5 \\
+\text{H}_1: \mu_5 &\neq 5 \\
+\end{aligned}
+\end{array}
+\]
+
+*Variables *Cereals*(${\mu_6}$), *Starch*(${\mu_7}$), *Nuts*(${\mu_8}$), *FruitVeg*(${\mu_9}$)*
+
+\[
+\begin{array}{cccc}
+\begin{aligned}
+\text{H}_0: \mu_6 &= 30 \\
+\text{H}_1: \mu_6 &\neq 30 \\
+\end{aligned}
+&
+\begin{aligned}
+\text{H}_0: \mu_7 &= 4 \\
+\text{H}_1: \mu_7 &\neq 4 \\
+\end{aligned}
+&
+\begin{aligned}
+\text{H}_0: \mu_8 &= 3 \\
+\text{H}_1: \mu_8 &\neq 3 \\
+\end{aligned}
+&
+\begin{aligned}
+\text{H}_0: \mu_9 &= 4 \\
+\text{H}_1: \mu_9 &\neq 4 \\
+\end{aligned}
+\end{array}
+\]
+
+
+```{r}
+# Obtenemos los nombres de las columnas
+variables <- colnames(F_Data) 
+
+# Creamos los valores de mu para las prueba t
+mu_value <- c(9, 7, 2, 15, 5, 30, 4, 3, 4)
+
+# Creamos un DataFrame vacío para almacenar los resultados
+results <- data.frame(Variable = character(), P_Value = numeric(), stringsAsFactors = FALSE)
+
+# Recorremos las columnas y realizamos el t.test para cada una
+for (i in 1:length(variables)) {
+  variable_name <- variables[i]
+  test_result <- t.test(Data[[variable_name]], mu = mu_value[i], conf.level = 0.95)
+  
+  # Añadimos los resultados al DataFrame
+  results <- rbind(results, data.frame(Variable = variable_name, P_Value = test_result$p.value))
+}
+
+# Mostramos los resultados de los p-valores
+kable(results)
+```
+Después de realizar pruebas t univariadas para cada variable, utilizando valores específicos de 𝜇 como referencia para verificar las sospechas sobre la cantidad de gramos promedio de una determinada proteína consumidos por persona al día en 25 países, se interpretaron los p-valores obtenidos bajo niveles de significancia de 0.01, 0.05 y 0.10.
+
+A un nivel de significancia de 0.01, no se rechaza la hipótesis nula para ninguna de las variables, lo que sugiere que las medias no difieren significativamente de los valores propuestos para 𝜇. 
+
+Al aplicar un nivel de significancia de 0.05, solo la variable "Eggs" mostró un p-valor menor a 0.05, lo que permite rechazar la hipótesis nula e indica que su media difiere significativamente del valor 𝜇. 
+
+Al aumentar el nivel de significancia a 0.10, el resultado permanece constante, y "Eggs" sigue siendo la única variable para la cual se puede rechazar la hipótesis nula. *Sin embargo, es importante señalar que podrían existir otros valores de 𝜇 que también sean consistentes con los datos, lo que introduce cierta incertidumbre en la interpretación de los resultados por lo que debemos optar por realizar una prueba normal multivariada.*
+
+
+### ii. De forma **Multivariada**
+
+Dado que nuestro objetivo es contrastar si (en conjunto) el vector \(\mu_0\) dado es un valor plausible para \(\mu\) buscamos probar
+
+$$
+\begin{aligned}
+\text{H}_0 &: \symbf{\mu} = \symbf{\mu_0} \\
+\text{H}_1 &: \symbf{\mu} \neq \symbf{\mu_0}
+\end{aligned}
+$$
+Usaremos la **Estadística de $T^2$ de Hoteling** que es una generalización de la prueba t univariada.
+
+Obtuvimos a partir de la prueba el siguiente resultado:
+
+```{r, fig.align='center', echo = FALSE }
+T2_Hot<-function(mu0,alpha,n){
+Data_means<-colMeans(F_Data)
+Data_Cov<-cov(F_Data)
+Inv_Data_Cov <- solve(Data_Cov)
+Dif_Med<- Data_means - mu0
+T_2<-n%*%t(Dif_Med)%*%Inv_Data_Cov%*%Dif_Med
+return(T_2)
+}
+
+T2_V <- T2_Hot(mu_value,0.05,25)
+
+alpha=0.05
+p=9
+n=25
+qf<-qf(alpha,p,n-p,lower.tail = F)
+Vc<- round((((n-1)*p)/(n-p))*qf,5)
+
+results_df <- data.frame(
+  `Valor Estadístico` = T2_V,
+  `Valor Crítico` = Vc
+)
+
+kable(results_df)
+```
+Como el valor estadístico (64.84185) es superior al valor crítico (34.2585), se rechaza la hipótesis nula \( H_0 \). Esto sugiere que hay suficiente evidencia para concluir que el promedio de gramos de distintos proteína consumidos no coincide con los valores propuestos en \(\mu_0\).
+
+
+```{r Prueba formal, message=FALSE, warning=FALSE}
+
+# ----- Prueba de Shapiro ----- #
+require(mvShapiroTest)
+mvShapiro.Test(X)
+# ----- Otras Pruebas ----- #
+mvn(X, mvnTest="mardia") # test de Mardia
+mvn(X, mvnTest="hz") # test de Henze-Zirkler
+mvn(X, mvnTest="royston") # test de Royston
+mvn(X, mvnTest="dh") # test de Doornik-Hansen
+```
